@@ -7,7 +7,7 @@ script: |
 env:
   global:
   - EXTRA_DEPS="dot-merlin-reader"
-  - PINS="dot-merlin-reader.dev:."
+  - PINS="dot-merlin-reader.dev:. dune:https://github.com/voodoos/dune.git#ocaml-merlin"
   matrix:
   - OCAML_VERSION=4.02
     PACKAGE=merlin
