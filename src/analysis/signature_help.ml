@@ -70,8 +70,7 @@ let pp_parameter env label ppf ty =
     Format.fprintf ppf "?%s:%a" l (pp_parameter_type env) (unwrap_option ty)
 
 (* record buffer offsets to be able to underline parameter types *)
-let print_parameter_offset ?arg:argument buffer env label ty =
-  let ppf = Format.formatter_of_buffer buffer in
+let print_parameter_offset ?arg:argument ppf buffer env label ty =
   let param_start = Buffer.length buffer in
   Format.fprintf ppf "%a%!" (pp_parameter env label) ty;
   let param_end = Buffer.length buffer in
@@ -82,19 +81,20 @@ let print_parameter_offset ?arg:argument buffer env label ty =
 let separate_function_signature ~args (e : Typedtree.expression) =
   Type_utils.Printtyp.reset ();
   let buffer = Buffer.create 16 in
+  let ppf = Format.formatter_of_buffer buffer in
   let rec separate ?(i=0) ?(parameters=[]) args ty =
     match (args, ty) with
     | (l, arg)::args, { Types.desc = Tarrow (label, ty1, ty2, _) } ->
-      let parameter = print_parameter_offset buffer e.exp_env label ty1 ?arg in
+      let parameter = print_parameter_offset ppf buffer e.exp_env label ty1 ?arg in
       separate args ty2 ~i:(succ i) ~parameters:(parameter::parameters)
 
     | [], { Types.desc = Tarrow (label, ty1, ty2, _) } ->
-      let parameter = print_parameter_offset buffer e.exp_env label ty1 in
+      let parameter = print_parameter_offset ppf buffer e.exp_env label ty1 in
       separate args ty2 ~i:(succ i) ~parameters:(parameter::parameters)
 
     (* end of function type, print remaining type without recording offsets *)
     | _ ->
-      Format.fprintf (Format.formatter_of_buffer buffer)
+      Format.fprintf ppf
         "%a%!" (pp_type e.exp_env) ty;
       { fun_name = extract_ident e.exp_desc
       ; signature = Buffer.contents buffer
