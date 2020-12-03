@@ -79,20 +79,18 @@ let print_parameter_offset ?arg:argument buffer env label ty =
   Format.pp_print_flush ppf ();
   { label; param_start; param_end; argument }
 
-let separate_function_signature ?args (e : Typedtree.expression) =
+let separate_function_signature ~args (e : Typedtree.expression) =
   Type_utils.Printtyp.reset ();
   let buffer = Buffer.create 16 in
-  let rec separate ?(i=0) ?(parameters=[]) ?args ty =
+  let rec separate ?(i=0) ?(parameters=[]) args ty =
     match (args, ty) with
-    | Some ((l, arg) :: args), { Types.desc = Tarrow (label, ty1, ty2, _) } ->
-      let offset = print_parameter_offset buffer e.exp_env label ty1 ?arg in
-      let parameters = offset::parameters in
-      separate ~args ty2 ~i:(succ i) ~parameters
+    | (l, arg)::args, { Types.desc = Tarrow (label, ty1, ty2, _) } ->
+      let parameter = print_parameter_offset buffer e.exp_env label ty1 ?arg in
+      separate args ty2 ~i:(succ i) ~parameters:(parameter::parameters)
 
-    | _, { Types.desc = Tarrow (label, ty1, ty2, _) } ->
-      let offset = print_parameter_offset buffer e.exp_env label ty1 in
-      let parameters = offset::parameters in
-      separate ty2 ~i:(succ i) ~parameters
+    | [], { Types.desc = Tarrow (label, ty1, ty2, _) } ->
+      let parameter = print_parameter_offset buffer e.exp_env label ty1 in
+      separate args ty2 ~i:(succ i) ~parameters:(parameter::parameters)
 
     (* end of function type, print remaining type without recording offsets *)
     | _ ->
@@ -104,7 +102,7 @@ let separate_function_signature ?args (e : Typedtree.expression) =
       ; active_param = None
       }
   in
-  separate ?args e.exp_type
+  separate args e.exp_type
 
 let active_parameter_by_arg ~arg params =
   let find_by_arg = function
@@ -144,7 +142,7 @@ let application_signature ~prefix = function
   (* provide signature information for applied functions *)
   | (_, Expression arg) :: (_, Expression { exp_desc =
       Texp_apply ({ exp_type = { desc = Tarrow _; _ }; _ } as e, args); _}) :: _ ->
-    let result = separate_function_signature ~args e in
+    let result = separate_function_signature e ~args in
     let active_param = active_parameter_by_arg ~arg result.parameters in
     let active_param = match active_param with
       | Some _ as ap -> ap
@@ -155,7 +153,7 @@ let application_signature ~prefix = function
   (* provide signature information directly after an unapplied function-type
      value *)
   | (_, Expression ({ exp_type = { desc = Tarrow _; _ }; _ } as e)) :: _ ->
-    let result = separate_function_signature e in
+    let result = separate_function_signature e ~args:[] in
     let active_param = active_parameter_by_prefix ~prefix result.parameters in
     `Application { result with active_param }
 
