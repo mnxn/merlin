@@ -113,22 +113,18 @@ let active_parameter_by_arg ~arg params =
   with Not_found -> None
 
 let active_parameter_by_prefix ~prefix params =
-  let string_get_opt s i = try Some s.[i] with Invalid_argument _ -> None in
-
-  let common prefix label =
-    match (string_get_opt prefix 0, label) with
-    | Some '~', Asttypes.Labelled l ->
-      Some (String.common_prefix_len prefix ("~" ^ l))
-    | Some '?', Asttypes.Optional l ->
-      Some (String.common_prefix_len prefix ("?" ^ l))
-    | _, Asttypes.Nolabel -> Some 0
+  let common = function
+    | Asttypes.Nolabel -> Some 0
+    | l when String.is_prefixed ~by:"~" prefix
+          || String.is_prefixed ~by:"?" prefix ->
+      Some (String.common_prefix_len (Btype.prefixed_label_name l) prefix)
     | _ -> None
   in
 
   let rec find_by_prefix ?(i=0) ?longest_len ?longest_i = function
     | [] -> longest_i
     | p :: ps ->
-      match common prefix p.label, longest_len with
+      match common p.label, longest_len with
       | Some common_len, Some longest_len when common_len > longest_len ->
         find_by_prefix ps ~i:(succ i) ~longest_len:common_len ~longest_i:i
       | Some common_len, None ->
